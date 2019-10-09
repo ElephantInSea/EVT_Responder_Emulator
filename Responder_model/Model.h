@@ -14,12 +14,15 @@ public:
 	
 	bool GLINTD;
 	uc PIR1, PIE1, T0STA, INTSTA;
+	bool PEIF;
 	uc TXSTA, RCSTA, SPBRG, USB_CTRL;
-	uc TXREG;
+	uc TXREG, RCREG;
 	bool CREN, TX9D, TXEN, TXIF;
+	bool RCIF, RX9D, FERR, OERR;
 	uc PORTC, PORTD, PORTE;
 	uc DDRC, DDRD, DDRE;
 	uc LED_model [5];
+	uc Message [4][2];
 
 	
 	bool flag_send_mode;
@@ -44,6 +47,9 @@ public:
     uc buttons, buttons_time; 
     bool flag_first_launch;
 
+	std :: string Respondent [12];
+
+
 public:
 	Model (void);
 	Model (
@@ -55,18 +61,29 @@ public:
 	~Model(void);
 	
 	// Model code
+	
+	void Interrupts();
 	void One_mode_step();
-
-	void Set_led();
 	void Show_Indications();
+
+	void My_send (int);
+	void My_recv (uc);
+
+
+	std :: string Get_Error_status();
 	std :: string Get_binary_format(uc ); 
 	std :: string Get_led2();
 	std :: string Get_led();
+	void Set_led ();
 	void Set_PortE();
+	void Transmission_emulator();
+	void Variable_Start_up();
 
 	// Microcontroller code - in in the file Model_MK.cpp
 	void MK_main();
 
+	void MK_Check_mail (uc mail, bool nine);
+	void MK_Handler_receiver ();
 	
 	bool MK_Check(uc num);
 	void MK_Btns_action (uc btn);

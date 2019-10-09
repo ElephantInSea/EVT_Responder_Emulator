@@ -103,6 +103,75 @@ void Model :: MK_main()
 }
 
 
+void Model :: MK_Check_mail (uc mail, bool nine)
+{
+	while (mail)
+	{
+		if (mail & 0x01)
+			nine = !nine;
+		mail = mail >> 1;
+	}
+	if ((nine == 1) || (OERR || FERR))
+	{
+		error_code = 1;
+		CREN = 0;	//Receiver off
+	}
+}
+
+void Model :: MK_Handler_receiver ()
+{
+	/*Reception of data in variables a, b, c, d*/
+		
+	if(count_receive_data == 0)
+		error_code = 0;
+	uc recv_limit = 2;
+	// RCIF == USART receiver interrupt request flag
+	while (RCIF)	
+	{
+		// RCIF = 0; // Read only
+		My_recv(count_receive_data);
+		
+		bool mail_parity = RX9D;
+		uc mail = RCREG;
+				
+		MK_Check_mail (mail, mail_parity);
+		if ((error_code > 0) || (count_receive_data > 3))
+		{
+			while(RCIF)
+				mail = RCREG;
+		}
+		else
+		{
+			if (count_receive_data == 0)
+				a = mail;
+			else if (count_receive_data == 1)
+				b = mail;
+			else if (count_receive_data == 2)
+				c = mail;
+			else
+			{
+				d = mail;
+			}
+			count_receive_data++;
+		}
+		recv_limit --;
+		if (recv_limit == 0)
+			RCIF = 0;
+	}
+	
+	if ((error_code > 0) || (count_receive_data > 3))
+	{
+		flag_msg_received = 1;
+		CREN = 0;	//Receiver off
+	}
+	else if ( (count_receive_data < 3)) // recv_limit == 0
+		RCIF = 1;
+
+	PEIF = 0;
+	PIR1 = 0; // Just in case
+}
+
+
 bool Model :: MK_Check(uc num)
 {
 	if ((num > 12) || (num == 7))
@@ -110,6 +179,9 @@ bool Model :: MK_Check(uc num)
 		error_code = 4;
 		return 0;
 	}	
+	else if (flag_rw == 0) // When reading, only the mode number is important
+		return 1;
+
 	int i = 0;
 	int led_max = 1;
 	if (num == 0)
@@ -303,46 +375,12 @@ void Model :: MK_Reg_Start_up()
 	SPBRG = 0x9B;	// 155
 	USB_CTRL = 0x01;	// USB launch. Low Speed (1.5 Ìבטע/c),
 	
-	
 	GLINTD  = 0; // Reset All Interrupt Disable Bit
 	CREN = 0;
-	
 	
 	DDRE = 0xFC; 	// 0b11111100 Buttons * 5 and MANUAL/AUTO
 	
 	PORTE = 0;
-	
-	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
-	
-    flag_send_mode = 0;		// Turn on to receive data
-    flag_rw = 0;
-	led_active = 4;	// The number of the selected indicator. 
-					// 4 is the far left
-    mode = 255;
-    
-    count_receive_data = 0;
-    a = b = c = d = 0;
-    flag_msg_received = 0;	// Flag of received message
-    error_code = 0;
-	
-	// Setting local variables
-	main_temp = 0;
-    
-    send_mode_count = 0;
-    send_error_count = 0;
-    
-	d_line = 0;
-	d_work_light = 0;
-	
-    led_blink = 0;
-    
-    uc mode_temp = 0, mode_time = 0;
-    uc buttons = 0, buttons_time = 0;
-    
-    flag_first_launch = 1;
-
-	TXREG = 0;
-	TX9D = TXEN = TXIF = 0;
 }
 
 void Model :: MK_Send()
@@ -350,7 +388,7 @@ void Model :: MK_Send()
 	uc Package [4], temp = 0;
 	
 	// Receiver ON
-	CREN = 1;	
+	CREN = 1;
 	count_receive_data = 0; // In case of loss of parcels, or line break
 	a = b = c = d = 0;
 	flag_msg_received = 0;
@@ -416,18 +454,19 @@ void Model :: MK_Send()
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
 	//for (i=0;i<4;i++)
-	int i = 0, max = 5;
+	int i = 0, max = 4;
 	temp = 0;
 	
-	
+	TXIF = 1;
 	while ((i < max) && (temp < 250))
 	{	
 		
 		if (i == 4)
 		{
 			TXEN = 0; // Transmitter Turn Off
-			i ++;
+			//i ++;
 		}
+
 		else if (TXIF == 1)	// TXIF or TRMT.
 		{
 			bool parity = 0;
@@ -442,6 +481,9 @@ void Model :: MK_Send()
 			
 			TXREG = Package[i];
 			TXEN = 1; // Transmitter Turn On
+
+			My_send (i);
+
 			i++;
 		}
 		else
@@ -462,7 +504,7 @@ void Model :: MK_Send_part(bool flag_first_launch)
 	
 	
 	j ++;
-	if (j > 100)
+	if (j > 2)
 	{
 		j = 0;
 		i ++;
