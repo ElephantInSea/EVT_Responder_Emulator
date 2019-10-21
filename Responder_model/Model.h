@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <string>
+#include <vector>
 #include <Windows.h>
 
 typedef unsigned char uc;
@@ -22,9 +23,8 @@ public:
 	uc PORTC, PORTD, PORTE;
 	uc DDRC, DDRD, DDRE;
 	uc LED_model [5];
-	uc Message [4][2];
 
-	
+	// Global variables
 	bool flag_send_mode;
     bool flag_rw;
     bool flag_msg_received;
@@ -35,6 +35,7 @@ public:
     uc mode;
     uc count_receive_data;
     uc error_code;
+	uc error_code_temp;
 
 	// Local variables for an infinite loop in main
 	uc main_temp;
@@ -47,8 +48,13 @@ public:
     uc buttons, buttons_time; 
     bool flag_first_launch;
 
-	std :: string Respondent [12];
-
+	//std :: string Respondent [12];
+	std :: vector<int> asd;
+	std :: vector <std :: string> Respondent;
+	uc Message [4][2];
+	std :: string Send_Message;
+	std :: string Recv_Message;
+	bool flag_send;
 
 public:
 	Model (void);
@@ -68,12 +74,16 @@ public:
 
 	void My_send (int);
 	void My_recv (uc);
+	void My_recv2 (uc);
 
+	void Respondent_work (std :: string);
 
 	std :: string Get_Error_status();
 	std :: string Get_binary_format(uc ); 
 	std :: string Get_led2();
 	std :: string Get_led();
+	std :: string Get_str_send(uc, uc, uc, uc);
+
 	void Set_led ();
 	void Set_PortE();
 	void Transmission_emulator();

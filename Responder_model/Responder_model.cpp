@@ -7,6 +7,8 @@ int main()
 {
 	setlocale(LC_ALL, "rus");
 	Model Responder('1');
+
+
 	while (GetAsyncKeyState(VK_ESCAPE) == 0)
 	{
 		system("cls");

@@ -56,12 +56,13 @@ void Model :: Show_Indications()
 	std :: cout << "LED: = " << Get_led2() << std ::endl;
 	std :: cout << "Error: = " << Get_Error_status() << std :: endl; // '.'
 	std :: cout << "Mode: = " << Get_binary_format (mode) << std :: endl;
-	std :: cout << "Send = " << std :: endl;
-	std :: cout << "Recv = " << Get_binary_format (RCSTA) << std :: endl;
+	std :: cout << "Send = " << Send_Message << std :: endl;
+	std :: cout << "Recv = " << Recv_Message << std :: endl; // Get_binary_format (RCSTA)
 	std :: cout << (flag_manual_auto ? "MANUAL" : "AUTO") << std :: endl;
 	std :: cout << "PORTC = " << Get_binary_format (PORTC) << std ::endl; 
 	std :: cout << "PORTD = " << Get_binary_format (PORTD) << std ::endl; 
 	std :: cout << "PORTE = " << Get_binary_format (PORTE ^ 0xFF) << std ::endl; 
+	std :: cout << "Send: "<<(flag_send ? "." : " ") << std :: endl;
 }
 
 
@@ -72,6 +73,10 @@ void Model :: My_send (int count)
 	if (count == 3)
 	{
 		RCIF = 1;
+		Send_Message = Get_str_send(Message[0][0],
+			Message[1][0], Message[2][0], Message[3][0]);
+		Respondent_work (Send_Message);
+		flag_send = !flag_send;
 	}
 
 }
@@ -83,6 +88,93 @@ void Model :: My_recv (uc count)
 }
 	
 
+void Model :: My_recv2 (uc count)
+{
+	RCREG = 0;
+	if (count > 3)
+		return;
+	// 01234567890123
+	// 0x 12 34 56 78
+	uc part = Recv_Message[3 * count + 3] - 48;
+	if (part > 10) 
+		part -= 7;
+	//uc t2 = Recv_Message[3 * count + 3];
+	RCREG = part << 4;
+	//t2 = Recv_Message[3 * count + 4];
+	part = Recv_Message[3 * count + 4] - 48;
+	if (part > 10) 
+		part -= 7;
+
+	RCREG |= part;
+
+	bool parity = 0;
+	int t = (int)RCREG;
+	while (t)
+	{
+		if (t & 0x01)
+			parity = !parity;
+		t = t >> 1;
+	}
+	RX9D = parity; //1
+	
+	if (count == 2 || count > 2)
+		RCIF = 0;
+}
+
+void Model :: Respondent_work (std :: string income_msg)
+{
+	// 01234567890123
+	// 0x 12 34 56 78
+	int part = income_msg[3] - 48;
+	if (part > 9) 
+		part -= 7;
+	Recv_Message = "0x ";
+
+	//Recv_Message += part + ((part < 8) ? 48 : 55);
+	Recv_Message += income_msg[3];
+	Recv_Message += income_msg[4];
+	Recv_Message += ' ';
+
+	// key 2.
+	if (!GetAsyncKeyState(0x32))
+		Recv_Message += income_msg[6];
+	else
+	{
+		uc error = income_msg[6] - 48;
+		if (error > 9) 
+			error -= 7;
+
+		error |= 0x04;
+		//error |= GetAsyncKeyState(0x32) ? 0x40 : 0;
+	
+		error += (error < 10) ? 48 : 55;
+		Recv_Message += error;
+
+	}
+	//Recv_Message += income_msg[6] | (GetAsyncKeyState(0x32) ? 0x40 : 0);
+	
+	int t1 = income_msg[6] - 48;
+	if (t1 > 9) 
+		t1 -= 7;
+	if (t1 & 0x08)	// write
+	{
+		Respondent[part] = income_msg[7];
+		Respondent[part] += income_msg[9];
+		Respondent[part] += income_msg[10];
+		Respondent[part] += income_msg[12];
+		Respondent[part] += income_msg[13];
+	}
+
+	Recv_Message += Respondent[part][0];
+	char t = Respondent[part][0];
+	for (int i(0); i < 2; i ++)
+	{
+		Recv_Message += ' ';
+		Recv_Message += Respondent[part][2 * i + 1];
+		Recv_Message += Respondent[part][2 * i + 2];
+		t = Respondent[part][2 * i + 1];
+	}
+}
 
 std :: string Model :: Get_Error_status()
 {
@@ -171,6 +263,32 @@ std :: string Model :: Get_led()
 		answer += ' ';
 	}*/
 	return answer;
+}
+
+std :: string Hex_to_str (uc target)
+{
+	std :: string ans = "";
+	uc temp = (target >> 4) & 0x0F;
+	temp += (temp < 10) ? 48 : 55;
+	ans += temp;
+	temp = target & 0x0F;
+	temp += (temp < 10) ? 48 : 55;
+	ans += temp;
+	// ans += temp + ((temp < 8) ? 48 : 57);
+	return ans;
+}
+
+std :: string Model :: Get_str_send(uc A, uc B, uc C, uc D)
+{
+	std :: string ans = "0x ";
+	ans += Hex_to_str(A) + ' ';
+	ans += Hex_to_str(B) + ' ';
+	ans += Hex_to_str(C) + ' ';
+	ans += Hex_to_str(D);
+	//uc temp = A >> 4, temp2 = A & 0x0F;
+	//temp += temp < 8 ? 48 : 57;
+
+	return ans;
 }
 
 void Model :: Set_led()
@@ -299,6 +417,7 @@ void Model :: Variable_Start_up()
     a = b = c = d = 0;
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
+	error_code_temp = 0;
 
     send_mode_count = 0;
     send_error_count = 0;
@@ -323,8 +442,11 @@ void Model :: Variable_Start_up()
 
 	for (int i(0); i < 12; i++)
 	{
-		Respondent[i] = "0x";
-		Respondent[i] += "01234567";
+		//Respondent[i] = "12345";
+		Respondent.push_back ("12345");
 	}
+	Send_Message = "Empty";
+	Recv_Message = "Empty";
 
+	flag_send = false;
 }

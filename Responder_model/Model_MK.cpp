@@ -124,12 +124,11 @@ void Model :: MK_Handler_receiver ()
 		
 	if(count_receive_data == 0)
 		error_code = 0;
-	uc recv_limit = 2;
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
 	{
 		// RCIF = 0; // Read only
-		My_recv(count_receive_data);
+		My_recv2(count_receive_data);
 		
 		bool mail_parity = RX9D;
 		uc mail = RCREG;
@@ -137,8 +136,7 @@ void Model :: MK_Handler_receiver ()
 		MK_Check_mail (mail, mail_parity);
 		if ((error_code > 0) || (count_receive_data > 3))
 		{
-			while(RCIF)
-				mail = RCREG;
+			RCIF = 0;
 		}
 		else
 		{
@@ -154,9 +152,6 @@ void Model :: MK_Handler_receiver ()
 			}
 			count_receive_data++;
 		}
-		recv_limit --;
-		if (recv_limit == 0)
-			RCIF = 0;
 	}
 	
 	if ((error_code > 0) || (count_receive_data > 3))
@@ -164,7 +159,7 @@ void Model :: MK_Handler_receiver ()
 		flag_msg_received = 1;
 		CREN = 0;	//Receiver off
 	}
-	else if ( (count_receive_data < 3)) // recv_limit == 0
+	else if ((error_code == 0) && (count_receive_data < 4)) // recv_limit == 0
 		RCIF = 1;
 
 	PEIF = 0;
@@ -176,8 +171,8 @@ bool Model :: MK_Check(uc num)
 {
 	if ((num > 12) || (num == 7))
 	{
-		error_code = 4;
-		return 0;
+	//	error_code = 4;
+	//	return 0;
 	}	
 	else if (flag_rw == 0) // When reading, only the mode number is important
 		return 1;
@@ -192,7 +187,7 @@ bool Model :: MK_Check(uc num)
 	else if (num == 2)
 		led_max = 1999;
 	else if (num == 3)
-		led_max = 100;
+		led_max = 99;
 	else if (num > 3 && num < 7)	// 4, 5, 6
 		led_max = 2047;	
 	// For 8 and 9th modes, the limit will remain 1
@@ -316,7 +311,7 @@ void Model :: MK_Read_Msg()
 		// Package[1] - Package[3]
 		if (temp == 8 || temp == 9)
 			Rcv_numbers[4] = b & 0x01;
-		else if (temp < 9) 
+		else
 		{
 			Rcv_numbers[0] = b & 0x0F;
 			Rcv_numbers[1] = c >> 4;
@@ -324,20 +319,22 @@ void Model :: MK_Read_Msg()
 			Rcv_numbers[3] = d >> 4;
 			Rcv_numbers[4] = d & 0x0F;
 		}
-		
-		// (error_code == 0) - Otherwise, the alarm signal will be 
-		// replaced by a parity error
-		if ((flag_rw == 1) || (error_code == 0)) // Only when recording
-			for (temp = 0; temp < 5; temp ++)
+
+		for (temp = 0; temp < 5; temp ++)
+		{
+			if (error_code == 0)
 			{
 				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
-				if (LED[temp] != temp2)
+				if (flag_rw == 0)
+					LED[temp] = temp2;
+				else if (LED[temp] != temp2)
 					error_code = 1;
-					// flag_correct = 0;
-					//return 0;
 			}
-		
-		if ((temp == 12) || (b & 0x40))	// Alarm signal
+		}
+		// (error_code == 0) - Otherwise, the alarm signal will be 
+		// replaced by a parity error
+
+		if (b & 0x40)	// Alarm signal
 			error_code = 3;
 	}
 	return ;//1;
@@ -405,18 +402,19 @@ void Model :: MK_Send()
 	//Package[0] -= 1; // 0b00000001 == 0) Distance
 	if (mode & 0x80)
 	{
-		if (mode & 0x04)	// 0b00000100
+	//	if (mode & 0x04)	// 0b00000100
 							// The alarm signal comes from the device in
 							// the field
 							// Initially, the "Crash" signal was a 12th mode, 
 							// but then it was reduced only to the 7th bit 
 							// in a 1m word
-			Package[0] = 12;	// Crash
-		else
-			Package[0] += 5;
+	//		Package[0] = 12;	// Crash
+	//	else
+	//		Package[0] += 5;
+		Package[0] += 5;
 	}
-	if (Package[0] > 6)		//mode 7 is empty
-		Package[0] += 1;
+	//if (Package[0] > 6)		//mode 7 is empty
+	//	Package[0] += 1;
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
@@ -432,7 +430,7 @@ void Model :: MK_Send()
 	{
 		//Package [1]
 		//if (mode & 0x90)	// 0b10010000
-		if (Package[0] == 12 || Package[0] == 4 || Package[0] == 5)
+		if (Package[0] == 8 || Package[0] == 9)
 		{	
 			Package[1] = LED[4];
 			if (Package[0] == 12)
