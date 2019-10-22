@@ -123,21 +123,26 @@ void Model :: MK_Handler_receiver ()
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
-		error_code = 0;
+		error_code_interrupt = 0;
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
 	{
 		// RCIF = 0; // Read only
+		// Implementation +++
 		My_recv2(count_receive_data);
-		
+		// ++++++++++++++++++
+
 		bool mail_parity = RX9D;
 		uc mail = RCREG;
 				
 		MK_Check_mail (mail, mail_parity);
-		if ((error_code > 0) || (count_receive_data > 3))
+
+		// Implementation +++
+		if ((error_code_interrupt > 0) || (count_receive_data > 3))
 		{
 			RCIF = 0;
 		}
+		// ++++++++++++++++++
 		else
 		{
 			if (count_receive_data == 0)
@@ -154,12 +159,12 @@ void Model :: MK_Handler_receiver ()
 		}
 	}
 	
-	if ((error_code > 0) || (count_receive_data > 3))
+	if ((error_code_interrupt > 0) || (count_receive_data > 3))
 	{
 		flag_msg_received = 1;
 		CREN = 0;	//Receiver off
 	}
-	else if ((error_code == 0) && (count_receive_data < 4)) // recv_limit == 0
+	else if ((error_code_interrupt == 0) && (count_receive_data < 4)) // recv_limit == 0
 		RCIF = 1;
 
 	PEIF = 0;
@@ -282,6 +287,9 @@ void Model :: MK_Read_Msg()
 	// Call from Send_part()
 	// bit flag_correct = 1;
 	// Package[0]
+
+	error_code = error_code_interrupt;
+
 	uc temp = a >> 4;
 	bool flag_d_line_3 = 0;
 	

@@ -417,7 +417,7 @@ void Model :: Variable_Start_up()
     a = b = c = d = 0;
     flag_msg_received = 0;	// Flag of received message
     error_code = 0;
-	error_code_temp = 0;
+	error_code_interrupt = 0;
 
     send_mode_count = 0;
     send_error_count = 0;

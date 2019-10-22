@@ -35,7 +35,7 @@ public:
     uc mode;
     uc count_receive_data;
     uc error_code;
-	uc error_code_temp;
+	uc error_code_interrupt;
 
 	// Local variables for an infinite loop in main
 	uc main_temp;
