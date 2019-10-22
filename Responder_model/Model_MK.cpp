@@ -94,11 +94,9 @@ void Model :: MK_main()
 			flag_first_launch = 0;
 	}
 		
-
 	d_line ++;
 	if (d_line > 4)
 		d_line = 0;
-
 
 }
 
@@ -386,6 +384,20 @@ void Model :: MK_Reg_Start_up()
 	DDRE = 0xFC; 	// 0b11111100 Buttons * 5 and MANUAL/AUTO
 	
 	PORTE = 0;
+    
+	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
+	
+    flag_send_mode = 0;		// Turn on to receive data
+    flag_rw = 0;
+	led_active = 4;	// The number of the selected indicator. 
+					// 4 is the far left
+    mode = 255;
+    
+    count_receive_data = 0;
+    a = b = c = d = 0;
+    flag_msg_received = 0;	// Flag of received message
+    error_code = 0;
+	error_code_interrupt = 0;
 }
 
 void Model :: MK_Send()

@@ -54,7 +54,7 @@ public:
 	uc Message [4][2];
 	std :: string Send_Message;
 	std :: string Recv_Message;
-	bool flag_send;
+	int count_send_emulator;
 
 public:
 	Model (void);
@@ -87,7 +87,8 @@ public:
 	void Set_led ();
 	void Set_PortE();
 	void Transmission_emulator();
-	void Variable_Start_up();
+	void Variable_Start_up_emulator();
+	void Variable_Start_up_local();
 
 	// Microcontroller code - in in the file Model_MK.cpp
 	void MK_main();

@@ -5,9 +5,10 @@ Model::Model (void)
 {
 	PORTC = PORTD = PORTE = '0';
 	DDRC = DDRD = DDRE = '0';
+
 	Set_led();
-	MK_Reg_Start_up();
-	Variable_Start_up();
+	Variable_Start_up_emulator();
+	Variable_Start_up_local();
 }
 
 Model :: Model(
@@ -25,9 +26,8 @@ Model :: Model(
 	
 
 	Set_led();
-	
-	MK_Reg_Start_up();
-	Variable_Start_up();
+	Variable_Start_up_emulator();
+	Variable_Start_up_local();
 }
 
 
@@ -62,7 +62,7 @@ void Model :: Show_Indications()
 	std :: cout << "PORTC = " << Get_binary_format (PORTC) << std ::endl; 
 	std :: cout << "PORTD = " << Get_binary_format (PORTD) << std ::endl; 
 	std :: cout << "PORTE = " << Get_binary_format (PORTE ^ 0xFF) << std ::endl; 
-	std :: cout << "Send: "<<(flag_send ? "." : " ") << std :: endl;
+	std :: cout << "Count send: " << count_send_emulator << std :: endl;
 }
 
 
@@ -72,13 +72,14 @@ void Model :: My_send (int count)
 	Message[count][1] = (uc) TX9D;
 	if (count == 3)
 	{
-		RCIF = 1;
+		// key 3 "Line is broke"
+		if(!GetAsyncKeyState(0x33))
+			RCIF = 1;
 		Send_Message = Get_str_send(Message[0][0],
 			Message[1][0], Message[2][0], Message[3][0]);
 		Respondent_work (Send_Message);
-		flag_send = !flag_send;
+		count_send_emulator ++;
 	}
-
 }
 
 void Model :: My_recv (uc count)
@@ -397,46 +398,14 @@ void Model :: Transmission_emulator()
 	RCSTA %= 100;
 }
 
-void Model :: Variable_Start_up()
-{
-	// «десь устанавливаютс€ переменные которые устанавливались
-	// перед мейном, но тут эти переменные перестали быть локальными.
-	// ѕлюс вс€кие переменные нужные дл€ эмул€тора
-	// Setting local variables
-	main_temp = 0;
-    
-	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
-	
-    flag_send_mode = 0;		// Turn on to receive data
-    flag_rw = 0;
-	led_active = 4;	// The number of the selected indicator. 
-					// 4 is the far left
-    mode = 255;
-    
-    count_receive_data = 0;
-    a = b = c = d = 0;
-    flag_msg_received = 0;	// Flag of received message
-    error_code = 0;
-	error_code_interrupt = 0;
 
-    send_mode_count = 0;
-    send_error_count = 0;
-    
-	d_line = 0;
-	d_work_light = 0;
-    flag_first_launch = 1;
-	
-    led_blink = 0;
-    
-    uc mode_temp = 0, mode_time = 0;
-    uc buttons = 0, buttons_time = 0;
-	
+void Model :: Variable_Start_up_emulator()
+{
 	TXREG = 0;
 	TX9D = TXEN = TXIF = 0;
 	RCIF = 0;
 	OERR = FERR = 0;
 
-	// ѕеременные дл€ эмул€тора
 	for (int i(0); i < 4; i ++)
 		Message[i][0] = Message[i][0] = 0;
 
@@ -448,5 +417,26 @@ void Model :: Variable_Start_up()
 	Send_Message = "Empty";
 	Recv_Message = "Empty";
 
-	flag_send = false;
+	count_send_emulator = 0;
+}
+
+void Model :: Variable_Start_up_local()
+{
+	// «десь устанавливаютс€ переменные которые устанавливались
+	// перед мейном, но тут эти переменные перестали быть локальными.
+	// ѕлюс вс€кие переменные нужные дл€ эмул€тора
+	// Setting local variables
+	main_temp = 0; // Ќужно ли еще?
+    
+    send_mode_count = 0;	// Send iteration
+    send_error_count = 0;	
+
+	d_line = 0;
+	d_work_light = 0;
+    flag_first_launch = 1;
+	
+    led_blink = 0;
+    
+    uc mode_temp = 0, mode_time = 0;
+    uc buttons = 0, buttons_time = 0;
 }
