@@ -63,6 +63,8 @@ void Model :: Show_Indications()
 	std :: cout << "PORTD = " << Get_binary_format (PORTD) << std ::endl; 
 	std :: cout << "PORTE = " << Get_binary_format (PORTE ^ 0xFF) << std ::endl; 
 	std :: cout << "Count send: " << count_send_emulator << std :: endl;
+	std :: cout << "Work : " << (flag_led_work ? "O" : " ") << std :: endl;
+	std :: cout << "ERROR: " << (flag_led_work ? " " : "O") << std :: endl;
 }
 
 
@@ -116,6 +118,14 @@ void Model :: My_recv2 (uc count)
 			parity = !parity;
 		t = t >> 1;
 	}
+	// key 4 "Parity error"
+	if ((count == 3) && GetAsyncKeyState(0x34))
+		parity = !parity;
+	if (GetAsyncKeyState(0x35))
+		OERR = 1;
+	if (GetAsyncKeyState(0x36))
+		FERR = 1;
+
 	RX9D = parity; //1
 	
 	if (count == 2 || count > 2)
@@ -418,6 +428,7 @@ void Model :: Variable_Start_up_emulator()
 	Recv_Message = "Empty";
 
 	count_send_emulator = 0;
+	flag_led_work = 0;
 }
 
 void Model :: Variable_Start_up_local()

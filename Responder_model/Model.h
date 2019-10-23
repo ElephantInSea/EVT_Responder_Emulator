@@ -55,6 +55,7 @@ public:
 	std :: string Send_Message;
 	std :: string Recv_Message;
 	int count_send_emulator;
+	bool flag_led_work;
 
 public:
 	Model (void);
@@ -103,5 +104,7 @@ public:
 	void MK_Send();
 	void MK_Send_part(bool flag_first_launch);
 	uc MK_Show_ERROR();
+
+	uc Get_port_e(uc d_line);
 };
 

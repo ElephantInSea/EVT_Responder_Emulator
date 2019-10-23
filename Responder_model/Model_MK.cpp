@@ -33,13 +33,10 @@ void Model :: MK_main()
 		flag_manual_auto = 1;
 		
 	temp = (PORTE ^ 0xF8) >> 3;	// Port E is inverted
-	if((d_line & 0x01) && (temp > 0))	// mode
+	if((d_line & 0x01) && temp > 0)	// mode
 	{
 		// Parity condition and nonzero reception
-			
-		// Mark of the second line of switches
-		if (d_line == 3)
-			temp |= 0x80;	// 0b100xxxxx
+		temp = Get_port_e(d_line);
 				
 		if (mode != temp)
 		{
@@ -71,10 +68,11 @@ void Model :: MK_main()
 			if (buttons_time <= 5)	// A pressed key will work
 				buttons_time ++;	// only once
 				//
-			if (buttons_time == 5)
+			if (buttons_time == 5 && buttons > 0)
 			{
 				/* TODO (#1#): Определить что делать с неотправленным 
-					            сообщением */
+								сообщением */
+
 				MK_Btns_action (buttons);
 			}
 		}
@@ -84,6 +82,8 @@ void Model :: MK_main()
 			buttons = temp;
 		}
 	}
+	
+	
 	
 
 	// Send Part -----------------------------------------------------------
@@ -111,7 +111,7 @@ void Model :: MK_Check_mail (uc mail, bool nine)
 	}
 	if ((nine == 1) || (OERR || FERR))
 	{
-		error_code = 1;
+		error_code_interrupt = 1;
 		CREN = 0;	//Receiver off
 	}
 }
@@ -121,7 +121,9 @@ void Model :: MK_Handler_receiver ()
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
+	{
 		error_code_interrupt = 0;
+	}
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
 	{
@@ -161,6 +163,9 @@ void Model :: MK_Handler_receiver ()
 	{
 		flag_msg_received = 1;
 		CREN = 0;	//Receiver off
+		// Implementation +++
+		OERR = FERR = 0;
+		// ++++++++++++++++++
 	}
 	else if ((error_code_interrupt == 0) && (count_receive_data < 4)) // recv_limit == 0
 		RCIF = 1;
@@ -289,21 +294,8 @@ void Model :: MK_Read_Msg()
 	error_code = error_code_interrupt;
 
 	uc temp = a >> 4;
-	bool flag_d_line_3 = 0;
 	
-	if (temp > 4)
-	{
-		flag_d_line_3 = 1;
-		if (temp == 12)
-			temp = 7;	
-		temp -= 5;	// Checked this code in the online compiler - Works
-	}
-	
-	uc temp2 = 0x01 << temp;
-	if (flag_d_line_3)
-		temp2 |= 0x80;
-		
-	if (temp2 != mode)
+	if (temp != mode)
 		error_code = 1; 
 	
 	if (error_code == 0)
@@ -330,7 +322,7 @@ void Model :: MK_Read_Msg()
 		{
 			if (error_code == 0)
 			{
-				temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
+				uc temp2 = Rcv_numbers[temp];	// Bugs and features of the compiler
 				if (flag_rw == 0)
 					LED[temp] = temp2;
 				else if (LED[temp] != temp2)
@@ -412,27 +404,7 @@ void Model :: MK_Send()
 	//error_code = 0; //in Read_Msg()
 	
 	//Package [0]
-	Package[0] = 0;
-	temp = mode & 0x1F;	// 0b00011111
-	while (temp != 0x01)
-	{
-		temp = temp >> 1;
-		Package[0] += 1;
-	}
-	//Package[0] -= 1; // 0b00000001 == 0) Distance
-	if (mode & 0x80)
-	{
-	//	if (mode & 0x04)	// 0b00000100
-							// The alarm signal comes from the device in
-							// the field
-							// Initially, the "Crash" signal was a 12th mode, 
-							// but then it was reduced only to the 7th bit 
-							// in a 1m word
-	//		Package[0] = 12;	// Crash
-	//	else
-	//		Package[0] += 5;
-		Package[0] += 5;
-	}
+	Package[0] = mode;
 	//if (Package[0] > 6)		//mode 7 is empty
 	//	Package[0] += 1;
 	
@@ -476,15 +448,24 @@ void Model :: MK_Send()
 	temp = 0;
 	
 	TXIF = 1;
-	while ((i < max) && (temp < 250))
+	while ((i < max) && (temp < 5)) // 250
 	{	
 		
+		
+		// Implementation +++
+		// key 7 "Send error"
+		if(GetAsyncKeyState(0x37))
+			TXIF = 0;
+		else
+			TXIF = 1;
+		
+		// ++++++++++++++++++
 		if (i == 4)
 		{
 			TXEN = 0; // Transmitter Turn Off
 			//i ++;
 		}
-
+		
 		else if (TXIF == 1)	// TXIF or TRMT.
 		{
 			bool parity = 0;
@@ -520,7 +501,6 @@ void Model :: MK_Send_part(bool flag_first_launch)
 	static uc i;
 	static uc j;
 	
-	
 	j ++;
 	if (j > 2)
 	{
@@ -540,9 +520,8 @@ void Model :: MK_Send_part(bool flag_first_launch)
 			if (error_code  == 0)
 				flag_send_mode = 0;
 		}
-		else
+		else if (error_code != 4)
 			error_code = 2; // Line break
-		
 	}
 }
 
@@ -553,7 +532,7 @@ uc Model :: MK_Show_ERROR()
 	uc work_led = 0x02;	// 0x02 work; 0x01 error
 	
 	j++;
-	if (j == 255)
+	if (j == 2) // 255
 	{
 		j = 0;
 		i ++;		
@@ -563,27 +542,54 @@ uc Model :: MK_Show_ERROR()
 		i = j = 0;
 	else if (error_code == 1)	// Parity
 	{
-		if (i < 10)
+		if (i < 2) //10
 			work_led = 0x01; 
-		else if (i < 11)
-			i --;
 	}
 	else if(error_code == 2)	// Line is broken
 	{
-		if (i < 128)
+		if (i < 5) // 128
 			work_led = 0x01;
 	}
 	else if(error_code == 3)	// 12 mode, Error
 		work_led = 0x01;
 	else if(error_code == 4)	// Send Error
 	{
-		if (i < 128) 
+		if (i < 5) // 128
 			work_led = 0x01;
-		else if((work_led > 171) && (work_led <= 214))
+		else if((i > 5) && (i < 9)) //171, 214
 			work_led = 0x01;
 	}
 
-	if (i == 255)
+	if (i == 10) // 255
 		i = 0;
+	
+	// Implementation +++
+	if (work_led == 0x02)
+		flag_led_work = true;
+	else 
+		flag_led_work = false;
+	// ++++++++++++++++++
+
 	return work_led;
+}
+
+
+uc Model :: Get_port_e(uc d_line)
+{
+	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
+	uc temp2 = 0;
+
+	while (temp != 0x01)
+	{
+		temp = temp >> 1;
+		temp2 += 1;
+	}
+	if (d_line == 3)
+	{
+		temp2 += 5;
+		if (temp2 > 6)
+			temp2 += 1;
+	}
+	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
+	return temp2;
 }
