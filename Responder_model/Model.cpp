@@ -139,6 +139,10 @@ void Model :: Respondent_work (std :: string income_msg)
 	int part = income_msg[3] - 48;
 	if (part > 9) 
 		part -= 7;
+	if (part == 12)
+		part = 7;
+	else if (part > 12)
+		part -= 3;
 	Recv_Message = "0x ";
 
 	//Recv_Message += part + ((part < 8) ? 48 : 55);
@@ -146,28 +150,21 @@ void Model :: Respondent_work (std :: string income_msg)
 	Recv_Message += income_msg[4];
 	Recv_Message += ' ';
 
-	// key 2.
-	if (!GetAsyncKeyState(0x32))
-		Recv_Message += income_msg[6];
-	else
-	{
-		uc error = income_msg[6] - 48;
-		if (error > 9) 
-			error -= 7;
-
-		error |= 0x04;
-		//error |= GetAsyncKeyState(0x32) ? 0x40 : 0;
 	
-		error += (error < 10) ? 48 : 55;
-		Recv_Message += error;
+	uc b2 = income_msg[6] - 48;
+	if (b2 > 9) 
+		b2 -= 7;
+		//Recv_Message += income_msg[6];
+	// key 2.
+	if (GetAsyncKeyState(0x32))
+		b2 |= 0x04;
+	//error |= GetAsyncKeyState(0x32) ? 0x40 : 0;
+	b2 += (b2 < 10) ? 48 : 55;
+	Recv_Message += b2;
 
-	}
 	//Recv_Message += income_msg[6] | (GetAsyncKeyState(0x32) ? 0x40 : 0);
 	
-	int t1 = income_msg[6] - 48;
-	if (t1 > 9) 
-		t1 -= 7;
-	if (t1 & 0x08)	// write
+	if (b2 & 0x08)	// write
 	{
 		Respondent[part] = income_msg[7];
 		Respondent[part] += income_msg[9];

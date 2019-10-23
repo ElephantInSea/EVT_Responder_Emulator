@@ -36,7 +36,7 @@ void Model :: MK_main()
 	if((d_line & 0x01) && temp > 0)	// mode
 	{
 		// Parity condition and nonzero reception
-		temp = Get_port_e(d_line);
+		temp = MK_Get_port_e(d_line);
 				
 		if (mode != temp)
 		{
@@ -177,16 +177,17 @@ void Model :: MK_Handler_receiver ()
 
 bool Model :: MK_Check(uc num)
 {
-	if ((num > 12) || (num == 7))
+	// 10 = A, 11 = B, 15 = F
+	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
 	{
-	//	error_code = 4;
-	//	return 0;
+		error_code = 4;
+		return 0;
 	}	
 	else if (flag_rw == 0) // When reading, only the mode number is important
 		return 1;
 
 	int i = 0;
-	int led_max = 1;
+	int led_max = 2047;
 	if (num == 0)
 		led_max = 199;
 	else if (num == 1)
@@ -196,9 +197,9 @@ bool Model :: MK_Check(uc num)
 		led_max = 1999;
 	else if (num == 3)
 		led_max = 99;
-	else if (num > 3 && num < 7)	// 4, 5, 6
-		led_max = 2047;	
-	// For 8 and 9th modes, the limit will remain 1
+	else if (num > 7 && num < 10)	// 8, 9
+		led_max = 1;	
+	// For 4-6 and 12-14 modes, the limit will remain 2047
 	
 	int led_real = 0;
 	int factor = 1;
@@ -379,11 +380,11 @@ void Model :: MK_Reg_Start_up()
     
 	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
 	
-    flag_send_mode = 0;		// Turn on to receive data
+    flag_send_mode = 1;		// Turn on to receive data
     flag_rw = 0;
 	led_active = 4;	// The number of the selected indicator. 
 					// 4 is the far left
-    mode = 255;
+    mode = 0;
     
     count_receive_data = 0;
     a = b = c = d = 0;
@@ -405,8 +406,6 @@ void Model :: MK_Send()
 	
 	//Package [0]
 	Package[0] = mode;
-	//if (Package[0] > 6)		//mode 7 is empty
-	//	Package[0] += 1;
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
@@ -574,7 +573,7 @@ uc Model :: MK_Show_ERROR()
 }
 
 
-uc Model :: Get_port_e(uc d_line)
+uc Model :: MK_Get_port_e(uc d_line)
 {
 	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
 	uc temp2 = 0;
@@ -587,8 +586,11 @@ uc Model :: Get_port_e(uc d_line)
 	if (d_line == 3)
 	{
 		temp2 += 5;
-		if (temp2 > 6)
+		if (temp2 > 8)
+			temp2 += 3;
+		else if (temp2 > 6)
 			temp2 += 1;
+
 	}
 	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
 	return temp2;

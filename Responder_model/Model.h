@@ -105,6 +105,6 @@ public:
 	void MK_Send_part(bool flag_first_launch);
 	uc MK_Show_ERROR();
 
-	uc Get_port_e(uc d_line);
+	uc MK_Get_port_e(uc d_line);
 };
 
