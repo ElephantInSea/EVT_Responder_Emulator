@@ -39,8 +39,6 @@ public:
 
 	// Local variables for an infinite loop in main
 	uc main_temp;
-    int send_mode_count;
-    int send_error_count;	
 	int d_line;	
 	uc d_work_light; 
     int led_blink;
@@ -56,6 +54,7 @@ public:
 	std :: string Recv_Message;
 	int count_send_emulator;
 	bool flag_led_work;
+	bool flag_ampl;
 
 public:
 	Model (void);
@@ -87,7 +86,6 @@ public:
 
 	void Set_led ();
 	void Set_PortE();
-	void Transmission_emulator();
 	void Variable_Start_up_emulator();
 	void Variable_Start_up_local();
 
@@ -97,14 +95,14 @@ public:
 	void MK_Check_mail (uc mail, bool nine);
 	void MK_Handler_receiver ();
 	
-	bool MK_Check(uc num);
 	void MK_Btns_action (uc btn);
+	bool MK_Check(uc num);
+	uc MK_Get_port_e(uc d_line);
 	void MK_Read_Msg();
 	void MK_Reg_Start_up();
 	void MK_Send();
 	void MK_Send_part(bool flag_first_launch);
 	uc MK_Show_ERROR();
 
-	uc MK_Get_port_e(uc d_line);
 };
 

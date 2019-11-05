@@ -399,12 +399,6 @@ void Model :: Set_PortE()
 	PORTE ^= 0xFF;
 }
 
-void Model :: Transmission_emulator()
-{
-	RCSTA ++;
-	RCSTA %= 100;
-}
-
 
 void Model :: Variable_Start_up_emulator()
 {
@@ -426,6 +420,8 @@ void Model :: Variable_Start_up_emulator()
 
 	count_send_emulator = 0;
 	flag_led_work = 0;
+	
+	flag_ampl = 0;
 }
 
 void Model :: Variable_Start_up_local()
@@ -436,9 +432,6 @@ void Model :: Variable_Start_up_local()
 	// Setting local variables
 	main_temp = 0; // Нужно ли еще?
     
-    send_mode_count = 0;	// Send iteration
-    send_error_count = 0;	
-
 	d_line = 0;
 	d_work_light = 0;
     flag_first_launch = 1;

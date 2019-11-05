@@ -23,6 +23,7 @@ int main()
 		Responder.Show_Indications();
 		//Sleep (10);
 	}
+	Responder.~Model();
 	//system("pause");
 	return 0;
 }

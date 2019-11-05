@@ -121,9 +121,8 @@ void Model :: MK_Handler_receiver ()
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
-	{
 		error_code_interrupt = 0;
-	}
+
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
 	{
@@ -139,9 +138,7 @@ void Model :: MK_Handler_receiver ()
 
 		// Implementation +++
 		if ((error_code_interrupt > 0) || (count_receive_data > 3))
-		{
 			RCIF = 0;
-		}
 		// ++++++++++++++++++
 		else
 		{
@@ -152,9 +149,7 @@ void Model :: MK_Handler_receiver ()
 			else if (count_receive_data == 2)
 				c = mail;
 			else
-			{
 				d = mail;
-			}
 			count_receive_data++;
 		}
 	}
@@ -167,71 +162,16 @@ void Model :: MK_Handler_receiver ()
 		OERR = FERR = 0;
 		// ++++++++++++++++++
 	}
+	// Implementation +++
 	else if ((error_code_interrupt == 0) && (count_receive_data < 4)) // recv_limit == 0
 		RCIF = 1;
+	// ++++++++++++++++++
 
 	PEIF = 0;
 	PIR1 = 0; // Just in case
 }
 
 
-bool Model :: MK_Check(uc num)
-{
-	// 10 = A, 11 = B, 15 = F
-	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
-	{
-		error_code = 4;
-		return 0;
-	}	
-	else if (flag_rw == 0) // When reading, only the mode number is important
-		return 1;
-
-	int i = 0;
-	int led_max = 2047;
-	if (num == 0)
-		led_max = 199;
-	else if (num == 1)
-		return 1;
-		//led_max = 99999; // This is the maximum scoreboard
-	else if (num == 2)
-		led_max = 1999;
-	else if (num == 3)
-		led_max = 99;
-	else if (num > 7 && num < 10)	// 8, 9
-		led_max = 1;	
-	// For 4-6 and 12-14 modes, the limit will remain 2047
-	
-	int led_real = 0;
-	int factor = 1;
-	for (i = 0; i < 5; i ++)
-	{
-		int j = 0, j_max = (int)LED[i];
-		int temp = 0;
-		//led_real += factor * temp;	compilator fail
-		for (j = 0; j < j_max; j ++)
-			temp += factor;
-			
-		led_real += temp;
-		factor = factor * 10;
-	}
-	
-	//If the limit is exceeded - the display will reset to the maximum value
-	if (led_real > led_max)
-	{
-		//return 0;
-		int temp = 10000;
-		for (i = 0; i < 5; i ++)
-		{
-			//I doubt it
-			// LED[i] = (led max / (10000 / (10^i))) % 10`
-			factor = led_max / temp;
-			factor = factor % 10;
-			LED[i] = factor;
-			temp /= 10;
-		}
-	}
-	return 1;
-}
 
 void Model :: MK_Btns_action (uc btn)
 {
@@ -286,6 +226,87 @@ void Model :: MK_Btns_action (uc btn)
 	return;
 }
 
+bool Model :: MK_Check(uc num)
+{
+	// 10 = A, 11 = B, 15 = F
+	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
+	{
+		error_code = 4;
+		return 0;
+	}	
+	else if (flag_rw == 0) // When reading, only the mode number is important
+		return 1;
+
+	int i = 0;
+	int led_max = 2047;
+	if (num == 0)
+		led_max = 199;
+	else if (num == 1)
+		return 1;
+		//led_max = 99999; // This is the maximum scoreboard
+	else if (num == 2)
+		led_max = 1999;
+	else if (num == 3)
+		led_max = 99;
+	else if (num > 7 && num < 10)	// 8, 9
+		led_max = 1;	
+	// For 4-6 and 12-14 modes, the limit will remain 2047
+	
+	int led_real = 0;
+	int factor = 1;
+	for (i = 0; i < 5; i ++)
+	{
+		int j = 0, j_max = (int)LED[4-i];
+		int temp = 0;
+		//led_real += factor * temp;	compilator fail
+		for (j = 0; j < j_max; j ++)
+			temp += factor;
+			
+		led_real += temp;
+		factor = factor * 10;
+	}
+	int asd = led_real;
+	//If the limit is exceeded - the display will reset to the maximum value
+	if (led_real > led_max)
+	{
+		//return 0;
+		int temp = 10000;
+		for (i = 0; i < 5; i ++)
+		{
+			//I doubt it
+			// LED[i] = (led max / (10000 / (10^i))) % 10`
+			factor = led_max / temp;
+			factor = factor % 10;
+			LED[i] = factor;
+			temp /= 10;
+		}
+	}
+	return 1;
+}
+
+uc Model :: MK_Get_port_e(uc d_line)
+{
+	// In the original, the function is easier but more confusing.
+	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
+	uc temp2 = 0;
+
+	while (temp != 0x01)
+	{
+		temp = temp >> 1;
+		temp2 += 1;
+	}
+	if (d_line == 3)
+	{
+		temp2 += 5;
+		if (temp2 > 8)
+			temp2 += 3;
+		else if (temp2 > 6)
+			temp2 += 1;
+	}
+	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
+	return temp2;
+}
+
 void Model :: MK_Read_Msg()
 {
 	// Call from Send_part()
@@ -296,6 +317,10 @@ void Model :: MK_Read_Msg()
 
 	uc temp = a >> 4;
 	
+	// Implementation +++
+	if (flag_ampl == 1)
+		temp -= 8;
+	// ++++++++++++++++++
 	if (temp != mode)
 		error_code = 1; 
 	
@@ -407,6 +432,26 @@ void Model :: MK_Send()
 	//Package [0]
 	Package[0] = mode;
 	
+	
+	// Implementation +++
+	if ((Package[0] > 3) && (Package[0] < 7)) 
+	{
+		if ((flag_ampl == 0) && (LED[0] == 9))
+			flag_ampl = 1;
+	}
+
+	if (flag_ampl == 1)
+	{
+		if ((Package[0] < 4) || (Package[0] > 6))
+			flag_ampl = 0;
+		else
+		{
+			Package[0] += 8;
+			flag_rw = 0;
+		}
+	}
+	// ++++++++++++++++++
+	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
 	if (MK_Check(Package[0]) == 0)
@@ -414,7 +459,6 @@ void Model :: MK_Send()
 		flag_msg_received = 1;
 		return ;//0;
 	}
-	
 	if (flag_rw == 0) // Read
 		Package[1] = Package[2] = Package[3] = 0;
 	else //Write
@@ -424,8 +468,6 @@ void Model :: MK_Send()
 		if (Package[0] == 8 || Package[0] == 9)
 		{	
 			Package[1] = LED[4];
-			if (Package[0] == 12)
-				Package[1] = Package[1] << 6;
 			Package[2] = Package[3] = 0;
 		}
 		else
@@ -446,7 +488,9 @@ void Model :: MK_Send()
 	int i = 0, max = 4;
 	temp = 0;
 	
+	// Implementation +++
 	TXIF = 1;
+	// ++++++++++++++++++
 	while ((i < max) && (temp < 5)) // 250
 	{	
 		
@@ -457,8 +501,8 @@ void Model :: MK_Send()
 			TXIF = 0;
 		else
 			TXIF = 1;
-		
 		// ++++++++++++++++++
+		
 		if (i == 4)
 		{
 			TXEN = 0; // Transmitter Turn Off
@@ -480,7 +524,9 @@ void Model :: MK_Send()
 			TXREG = Package[i];
 			TXEN = 1; // Transmitter Turn On
 
+			// Implementation +++
 			My_send (i);
+			// ++++++++++++++++++
 
 			i++;
 		}
@@ -501,7 +547,7 @@ void Model :: MK_Send_part(bool flag_first_launch)
 	static uc j;
 	
 	j ++;
-	if (j > 2)
+	if (j > 2) // 100
 	{
 		j = 0;
 		i ++;
@@ -509,15 +555,21 @@ void Model :: MK_Send_part(bool flag_first_launch)
 	
 	if (((i == 0) && (j == 1)) || (flag_first_launch == 1))
 		MK_Send();
-	else if ((i == 3) || (flag_msg_received == 1))
+	else if ((i == 3) || ((flag_msg_received == 1) && (flag_ampl == 0)))
 	{
 		i = j = 0;
 		if (flag_msg_received == 1)
 		{
 			MK_Read_Msg();
+			
+			// Implementation +++
 			flag_msg_received = 0;
-			if (error_code  == 0)
-				flag_send_mode = 0;
+			if (flag_ampl == 0)
+			{
+				if (error_code == 0)
+					flag_send_mode = 0;
+			}
+			// ++++++++++++++++++
 		}
 		else if (error_code != 4)
 			error_code = 2; // Line break
@@ -572,26 +624,3 @@ uc Model :: MK_Show_ERROR()
 	return work_led;
 }
 
-
-uc Model :: MK_Get_port_e(uc d_line)
-{
-	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
-	uc temp2 = 0;
-
-	while (temp != 0x01)
-	{
-		temp = temp >> 1;
-		temp2 += 1;
-	}
-	if (d_line == 3)
-	{
-		temp2 += 5;
-		if (temp2 > 8)
-			temp2 += 3;
-		else if (temp2 > 6)
-			temp2 += 1;
-
-	}
-	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
-	return temp2;
-}
