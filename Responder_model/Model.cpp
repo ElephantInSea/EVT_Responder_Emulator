@@ -6,7 +6,6 @@ Model::Model (void)
 	PORTC = PORTD = PORTE = '0';
 	DDRC = DDRD = DDRE = '0';
 
-	Set_led();
 	Variable_Start_up_emulator();
 	Variable_Start_up_local();
 }
@@ -25,7 +24,6 @@ Model :: Model(
 	DDRE = ddrE;
 	
 
-	Set_led();
 	Variable_Start_up_emulator();
 	Variable_Start_up_local();
 }
@@ -38,14 +36,14 @@ Model :: ~Model(void)
 
 void Model :: Interrupts()
 {
+	// Called in One_mode_step
 	if (RCIF == 1)
-	{
 		MK_Handler_receiver();
-	}
 }
 
 void Model :: One_mode_step()
 {
+	// Called in Responder_model
 	Interrupts();
 	Set_PortE();
 	MK_main();
@@ -53,6 +51,7 @@ void Model :: One_mode_step()
 
 void Model :: Show_Indications()
 {
+	// Called in Responder_model
 	std :: cout << "LED: = " << Get_led2() << std ::endl;
 	std :: cout << "Error: = " << Get_Error_status() << std :: endl; // '.'
 	std :: cout << "Mode: = " << Get_binary_format (mode) << std :: endl;
@@ -70,15 +69,19 @@ void Model :: Show_Indications()
 
 void Model :: My_send (int count)
 {
+	// Called in MK_Send
 	Message[count][0] = TXREG;
 	Message[count][1] = (uc) TX9D;
+
 	if (count == 3)
 	{
 		// key 3 "Line is broke"
 		if(!GetAsyncKeyState(0x33))
 			RCIF = 1;
+
 		Send_Message = Get_str_send(Message[0][0],
 			Message[1][0], Message[2][0], Message[3][0]);
+
 		Respondent_work (Send_Message);
 		count_send_emulator ++;
 	}
@@ -86,25 +89,20 @@ void Model :: My_send (int count)
 
 void Model :: My_recv (uc count)
 {
-	RCREG = Message [count][0];
-	RX9D = (bool) Message [count][1];
-}
-	
-
-void Model :: My_recv2 (uc count)
-{
+	// Called in MK_Handler_receiver
 	RCREG = 0;
 	if (count > 3)
 		return;
 	// 01234567890123
 	// 0x 12 34 56 78
 	uc part = Recv_Message[3 * count + 3] - 48;
+
 	if (part > 10) 
 		part -= 7;
-	//uc t2 = Recv_Message[3 * count + 3];
+	
 	RCREG = part << 4;
-	//t2 = Recv_Message[3 * count + 4];
 	part = Recv_Message[3 * count + 4] - 48;
+
 	if (part > 10) 
 		part -= 7;
 
@@ -112,21 +110,24 @@ void Model :: My_recv2 (uc count)
 
 	bool parity = 0;
 	int t = (int)RCREG;
+
 	while (t)
 	{
 		if (t & 0x01)
 			parity = !parity;
 		t = t >> 1;
 	}
+
 	// key 4 "Parity error"
 	if ((count == 3) && GetAsyncKeyState(0x34))
 		parity = !parity;
+
 	if (GetAsyncKeyState(0x35))
 		OERR = 1;
 	if (GetAsyncKeyState(0x36))
 		FERR = 1;
 
-	RX9D = parity; //1
+	RX9D = parity;
 	
 	if (count == 2 || count > 2)
 		RCIF = 0;
@@ -134,37 +135,39 @@ void Model :: My_recv2 (uc count)
 
 void Model :: Respondent_work (std :: string income_msg)
 {
+	// Called in My_send
 	// 01234567890123
-	// 0x 12 34 56 78
+	// 0x 12 34 56 78 - example of the contents of the 
+	// variable income_msg, type string
 	int part = income_msg[3] - 48;
-	if (part > 9) 
-		part -= 7;
-	if (part == 12)
-		part = 7;
-	else if (part > 12)
-		part -= 3;
-	Recv_Message = "0x ";
 
-	//Recv_Message += part + ((part < 8) ? 48 : 55);
+	// In case of amplitude mode
+	if (part > 9)
+		part -= 7;
+	
+	if (part == 12)		// This code is needed because I decided to
+		part = 7;		// save a place and an array of the respondent 
+	else if (part > 12)	// for 14 places instead of 16
+		part -= 3;
+	
+	Recv_Message = "0x ";
 	Recv_Message += income_msg[3];
 	Recv_Message += income_msg[4];
 	Recv_Message += ' ';
-
 	
-	uc b2 = income_msg[6] - 48;
-	if (b2 > 9) 
-		b2 -= 7;
-		//Recv_Message += income_msg[6];
-	// key 2.
-	if (GetAsyncKeyState(0x32))
-		b2 |= 0x04;
-	//error |= GetAsyncKeyState(0x32) ? 0x40 : 0;
-	b2 += (b2 < 10) ? 48 : 55;
-	Recv_Message += b2;
+	uc h_half_sec_byte = income_msg[6] - 48; // high half second byte
 
-	//Recv_Message += income_msg[6] | (GetAsyncKeyState(0x32) ? 0x40 : 0);
+	if (h_half_sec_byte > 9) 
+		h_half_sec_byte -= 7;
+		
+	if (GetAsyncKeyState(0x32)) // key 2.
+		h_half_sec_byte |= 0x04;
 	
-	if (b2 & 0x08)	// write
+	h_half_sec_byte += (h_half_sec_byte < 10) ? 48 : 55;
+
+	Recv_Message += h_half_sec_byte;
+		
+	if (h_half_sec_byte & 0x08)	// write
 	{
 		Respondent[part] = income_msg[7];
 		Respondent[part] += income_msg[9];
@@ -174,18 +177,17 @@ void Model :: Respondent_work (std :: string income_msg)
 	}
 
 	Recv_Message += Respondent[part][0];
-	char t = Respondent[part][0];
 	for (int i(0); i < 2; i ++)
 	{
 		Recv_Message += ' ';
 		Recv_Message += Respondent[part][2 * i + 1];
 		Recv_Message += Respondent[part][2 * i + 2];
-		t = Respondent[part][2 * i + 1];
 	}
 }
 
 std :: string Model :: Get_Error_status()
 {
+	// Called in Show_Indications
 	std :: string ans = "";
 	if (error_code == 0)
 		ans += "Normal";
@@ -202,6 +204,7 @@ std :: string Model :: Get_Error_status()
 
 std :: string Model :: Get_binary_format(uc target)
 {
+	// Called in Show_Indications
 	std :: string answer = "0b";
 	for(int i(0); i < 8; i ++)
 	{
@@ -216,17 +219,17 @@ std :: string Model :: Get_binary_format(uc target)
 
 std :: string Model :: Get_led2()
 {
+	// Called in Show_Indications
 	std :: string answer = "";
-	uc temp = d_line == 0 ? 4 : (d_line - 1);
 	static bool blink = true;
-	int num = 0;
 	for (int i(0); i < 5; i++)
 	{
-		if ((i == (int)led_active) && (blink))
+		if ((i == (int)4 - led_active) && (blink))
+			answer += '_';
+		else if (i < (int)(4 - led_count))
 			answer += '_';
 		else
-			answer += 48 + LED[i];
-
+			answer += 48 + LED[4 - i];
 	}
 	blink = !blink;
 	return answer;
@@ -234,6 +237,8 @@ std :: string Model :: Get_led2()
 
 std :: string Model :: Get_led()
 {
+	// The function is close to reality, but less convenient. 
+	// I'm using the second version
 	std :: string answer = "";
 	int num = 0;
 
@@ -259,22 +264,12 @@ std :: string Model :: Get_led()
 			answer += '_';
 		answer += ' ';
 	}
-	/*
-	uc temp = d_line == 0 ? 4 : (d_line - 1);
-
-	for (int i(0); i < 5; i ++)
-	{
-		if (i == temp)
-			answer += LED_model[i];
-		else
-			answer += '_';
-		answer += ' ';
-	}*/
 	return answer;
 }
 
 std :: string Hex_to_str (uc target)
 {
+	// Called in Get_str_send
 	std :: string ans = "";
 	uc temp = (target >> 4) & 0x0F;
 	temp += (temp < 10) ? 48 : 55;
@@ -282,28 +277,21 @@ std :: string Hex_to_str (uc target)
 	temp = target & 0x0F;
 	temp += (temp < 10) ? 48 : 55;
 	ans += temp;
-	// ans += temp + ((temp < 8) ? 48 : 57);
+
 	return ans;
 }
 
 std :: string Model :: Get_str_send(uc A, uc B, uc C, uc D)
 {
+	// Called in My_send
 	std :: string ans = "0x ";
 	ans += Hex_to_str(A) + ' ';
 	ans += Hex_to_str(B) + ' ';
 	ans += Hex_to_str(C) + ' ';
 	ans += Hex_to_str(D);
-	//uc temp = A >> 4, temp2 = A & 0x0F;
-	//temp += temp < 8 ? 48 : 57;
-
 	return ans;
 }
 
-void Model :: Set_led()
-{
-	for (int i(0); i < 5; i ++)
-		LED_model[i] = '0';
-}
 
 void Model :: Set_PortE()
 {
@@ -317,15 +305,9 @@ void Model :: Set_PortE()
 	if (d_line == 1)
 	{
 		if(GetAsyncKeyState(0x51)) // Q
-		{
-//			unsigned short t = SetTimer(0, 0, 1000, NULL);
 			keys |= 0x01;
-		}
 		if(GetAsyncKeyState(0x57)) // W
-		{
-//			KillTimer(0, 0);
 			keys |= 0x02;
-		}
 		if(GetAsyncKeyState(0x45)) // E
 			keys |= 0x04;
 		if(GetAsyncKeyState(0x52)) // R
@@ -402,26 +384,27 @@ void Model :: Set_PortE()
 
 void Model :: Variable_Start_up_emulator()
 {
-	TXREG = 0;
-	TX9D = TXEN = TXIF = 0;
-	RCIF = 0;
-	OERR = FERR = 0;
+	// Called in constructor
 
 	for (int i(0); i < 4; i ++)
 		Message[i][0] = Message[i][0] = 0;
 
 	for (int i(0); i < 12; i++)
-	{
-		//Respondent[i] = "12345";
 		Respondent.push_back ("12345");
-	}
+	
+	for (int i(0); i < 5; i ++)
+		LED_model[i] = '0';
+	
+	TXREG = RCREG = 0;			// Registers and bits whose values 
+	TX9D = TXEN = TXIF = 0;		// are set by MK itself.
+	RCIF = RX9D = OERR = FERR = 0;
+
 	Send_Message = "Empty";
 	Recv_Message = "Empty";
 
 	count_send_emulator = 0;
 	flag_led_work = 0;
 	
-	flag_ampl = 0;
 }
 
 void Model :: Variable_Start_up_local()
@@ -431,7 +414,7 @@ void Model :: Variable_Start_up_local()
 	// Плюс всякие переменные нужные для эмулятора
 	// Setting local variables
 	main_temp = 0; // Нужно ли еще?
-    
+
 	d_line = 0;
 	d_work_light = 0;
     flag_first_launch = 1;

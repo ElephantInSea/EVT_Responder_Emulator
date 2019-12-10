@@ -2,10 +2,11 @@
 // Microcontroller code
 void Model :: MK_main()
 {
+	// Called in One_more_step
 	uc temp = 0;
 	// PORT D --------------------------------------------------------------
 	temp = 0x08 << d_line;
-	temp |= MK_Show_ERROR ();	//d_work_light;
+	temp |= MK_Show_ERROR ();
 	PORTD = temp;
 	
 	// PORT C --------------------------------------------------------------
@@ -15,8 +16,10 @@ void Model :: MK_main()
 		if (led_blink > 2)		// Delay for blinking
 			led_blink = 0;
 	}
-		
-	if ((d_line == led_active) && led_blink)
+	
+	if (d_line > led_count) 
+		temp = 0;
+	else if ((d_line == led_active) && led_blink)
 		temp = 0;
 	else
 	{
@@ -24,6 +27,10 @@ void Model :: MK_main()
 								// here.
 		temp = Translate_num_to_LED[(int)temp];
 	}
+
+	if ((flag_send_mode == 1) && (d_line == 0))
+		temp |= 0x01; // Point on the right indicator
+
 	PORTC = temp;
 
 	// PORT E --------------------------------------------------------------
@@ -48,6 +55,7 @@ void Model :: MK_main()
 					mode = temp;
 					flag_send_mode = 1;
 					flag_rw = 0; //Read
+					MK_Change_led_count(mode);
 				}
 			}
 			else
@@ -56,7 +64,7 @@ void Model :: MK_main()
 				flag_send_mode = 0;
 				mode_temp = temp;
 				mode_time = 0;
-				led_active = 4;
+				led_active = 0;
 				LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
 			}
 		}	
@@ -69,12 +77,7 @@ void Model :: MK_main()
 				buttons_time ++;	// only once
 				//
 			if (buttons_time == 5 && buttons > 0)
-			{
-				/* TODO (#1#): Определить что делать с неотправленным 
-								сообщением */
-
 				MK_Btns_action (buttons);
-			}
 		}
 		else 
 		{
@@ -83,9 +86,6 @@ void Model :: MK_main()
 		}
 	}
 	
-	
-	
-
 	// Send Part -----------------------------------------------------------
 	if ((flag_send_mode == 1) && (mode != 255))
 	{
@@ -103,6 +103,7 @@ void Model :: MK_main()
 
 void Model :: MK_Check_mail (uc mail, bool nine)
 {
+	// Called in MK_Handler_receiver
 	while (mail)
 	{
 		if (mail & 0x01)
@@ -118,6 +119,7 @@ void Model :: MK_Check_mail (uc mail, bool nine)
 
 void Model :: MK_Handler_receiver ()
 {
+	// Called in MK_main - Interruption part
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
@@ -126,9 +128,8 @@ void Model :: MK_Handler_receiver ()
 	// RCIF == USART receiver interrupt request flag
 	while (RCIF)	
 	{
-		// RCIF = 0; // Read only
 		// Implementation +++
-		My_recv2(count_receive_data);
+		My_recv(count_receive_data);
 		// ++++++++++++++++++
 
 		bool mail_parity = RX9D;
@@ -163,7 +164,7 @@ void Model :: MK_Handler_receiver ()
 		// ++++++++++++++++++
 	}
 	// Implementation +++
-	else if ((error_code_interrupt == 0) && (count_receive_data < 4)) // recv_limit == 0
+	else if ((error_code_interrupt == 0) && (count_receive_data < 4))
 		RCIF = 1;
 	// ++++++++++++++++++
 
@@ -175,6 +176,7 @@ void Model :: MK_Handler_receiver ()
 
 void Model :: MK_Btns_action (uc btn)
 {
+	// Called in MK_main - Button part 
 	uc temp = btn, count = 0;
 	while(temp)
 	{
@@ -182,6 +184,7 @@ void Model :: MK_Btns_action (uc btn)
 			count ++;
 		temp = temp >> 1;
 	}
+
 	// Will not work if none is pressed, or pressed more than 2 buttons
 	if (count != 1)
 		return;
@@ -198,17 +201,17 @@ void Model :: MK_Btns_action (uc btn)
 			LED[led_active] = 10;
 		LED[led_active] = LED[led_active] - 1;
 	}
-	else if (btn & 0x04)	// Left
+	else if (btn & 0x04)	// Left. LED 43210
 	{
-		if (led_active == 0)
-			led_active = 5;
-		led_active --;
+		led_active ++;
+		if (led_active > led_count)
+			led_active = 0;
 	}
 	else if (btn & 0x08)	// Right
 	{
-		led_active ++;
-		if (led_active > 4)
-			led_active = 0;
+		if (led_active == 0)
+			led_active = led_count + 1;
+		led_active --;
 	}
 	else if (btn & 0x10)	// Send
 	{
@@ -218,31 +221,46 @@ void Model :: MK_Btns_action (uc btn)
 			flag_rw = 1; //Write
 		}
 		else //STOP sending
-		{
 			flag_send_mode = flag_rw = 0;
-		}
 		//--------------------------
 	}
 	return;
 }
 
-bool Model :: MK_Check(uc num)
+void Model :: MK_Change_led_count(uc num)
 {
+	// Called in MK_main - Mode part
+	if (num == 0)
+		led_count = 2;
+	else if (num == 1)
+		led_count = 4;
+	else if (num == 3)
+		led_count = 1;
+	else if (num > 7 && num < 10)	// 8, 9
+		led_count = 0;
+	else
+		led_count = 3;
+}
+
+void Model :: MK_Check_and_correct(uc num)
+{
+	// Called in MK_Send
 	// 10 = A, 11 = B, 15 = F
 	if ((num == 7) || (num == 10) || (num == 11) || (num == 15))
 	{
-		error_code = 4;
-		return 0;
+		error_code = 4; // Send Error
+		return;
 	}	
 	else if (flag_rw == 0) // When reading, only the mode number is important
-		return 1;
+		return;
 
 	int i = 0;
 	int led_max = 2047;
+
 	if (num == 0)
 		led_max = 199;
 	else if (num == 1)
-		return 1;
+		return;
 		//led_max = 99999; // This is the maximum scoreboard
 	else if (num == 2)
 		led_max = 1999;
@@ -254,38 +272,40 @@ bool Model :: MK_Check(uc num)
 	
 	int led_real = 0;
 	int factor = 1;
+
 	for (i = 0; i < 5; i ++)
 	{
-		int j = 0, j_max = (int)LED[4-i];
+		int j = 0, j_max = (int)LED[i];
+		// led_real += factor * temp;	compilator fail
 		int temp = 0;
-		//led_real += factor * temp;	compilator fail
 		for (j = 0; j < j_max; j ++)
 			temp += factor;
 			
 		led_real += temp;
 		factor = factor * 10;
 	}
+
 	int asd = led_real;
-	//If the limit is exceeded - the display will reset to the maximum value
+	// If the limit is exceeded - the display will reset to the maximum value
 	if (led_real > led_max)
 	{
-		//return 0;
+		error_code = 255; // Too large numbers on LED
+		// LED[i] = (led max / (10000 / (10^i))) % 10`
 		int temp = 10000;
-		for (i = 0; i < 5; i ++)
+		for (i = 4; i >= 0; i --)
 		{
-			//I doubt it
-			// LED[i] = (led max / (10000 / (10^i))) % 10`
 			factor = led_max / temp;
 			factor = factor % 10;
-			LED[i] = factor;
+			LED[i] = factor; 
 			temp /= 10;
 		}
 	}
-	return 1;
+	return;
 }
 
 uc Model :: MK_Get_port_e(uc d_line)
 {
+	// Called in MK_main - Mode part
 	// In the original, the function is easier but more confusing.
 	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
 	uc temp2 = 0;
@@ -295,6 +315,7 @@ uc Model :: MK_Get_port_e(uc d_line)
 		temp = temp >> 1;
 		temp2 += 1;
 	}
+
 	if (d_line == 3)
 	{
 		temp2 += 5;
@@ -303,30 +324,25 @@ uc Model :: MK_Get_port_e(uc d_line)
 		else if (temp2 > 6)
 			temp2 += 1;
 	}
-	/* Here you can enter the setting of the amplitude mode 1, 2, 3 */
+
 	return temp2;
 }
 
 void Model :: MK_Read_Msg()
 {
-	// Call from Send_part()
-	// bit flag_correct = 1;
-	// Package[0]
-
+	// Called in MK_Send_Part
 	error_code = error_code_interrupt;
 
 	uc temp = a >> 4;
 	
-	// Implementation +++
-	if (flag_ampl == 1)
+	if (flag_mode_ampl == 1)
 		temp -= 8;
-	// ++++++++++++++++++
+
 	if (temp != mode)
 		error_code = 1; 
 	
 	if (error_code == 0)
 	{
-		temp = a >> 4;
 		uc Rcv_numbers [5];
 		
 		Rcv_numbers[0] = Rcv_numbers[1] = 0;
@@ -334,14 +350,14 @@ void Model :: MK_Read_Msg()
 		
 		// Package[1] - Package[3]
 		if (temp == 8 || temp == 9)
-			Rcv_numbers[4] = b & 0x01;
+			Rcv_numbers[0] = b & 0x01;
 		else
 		{
-			Rcv_numbers[0] = b & 0x0F;
-			Rcv_numbers[1] = c >> 4;
+			Rcv_numbers[4] = b & 0x0F;
+			Rcv_numbers[3] = c >> 4;
 			Rcv_numbers[2] = c & 0x0F;
-			Rcv_numbers[3] = d >> 4;
-			Rcv_numbers[4] = d & 0x0F;
+			Rcv_numbers[1] = d >> 4;
+			Rcv_numbers[0] = d & 0x0F;
 		}
 
 		for (temp = 0; temp < 5; temp ++)
@@ -355,17 +371,16 @@ void Model :: MK_Read_Msg()
 					error_code = 1;
 			}
 		}
-		// (error_code == 0) - Otherwise, the alarm signal will be 
-		// replaced by a parity error
 
 		if (b & 0x40)	// Alarm signal
 			error_code = 3;
 	}
-	return ;//1;
+	return ;
 }
 
 void Model :: MK_Reg_Start_up()
 {
+	// Call from MK_main
 	GLINTD = 1;		// Disable All Interrupts
 	PORTE = 0x00;	// Getting button codes and modes
 	DDRE  = 0x00;
@@ -379,9 +394,8 @@ void Model :: MK_Reg_Start_up()
 	PORTE = 0x2E; // 0b00101110
 	
 	for (a = 0; (int)a < 255; a += 1)
-	{
 		for (b = 0; (int)b < 255; b += 1);
-	}
+
 	a = b = 0;	
 	
 	PIR1    = 0x00;	// Reset Interrupt Request Flags
@@ -403,23 +417,28 @@ void Model :: MK_Reg_Start_up()
 	
 	PORTE = 0;
     
-	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
-	
-    flag_send_mode = 1;		// Turn on to receive data
-    flag_rw = 0;
-	led_active = 4;	// The number of the selected indicator. 
-					// 4 is the far left
-    mode = 0;
-    
-    count_receive_data = 0;
-    a = b = c = d = 0;
+	// Flags
+	flag_manual_auto = 0;
+	flag_mode_ampl = 0;
     flag_msg_received = 0;	// Flag of received message
+    flag_rw	= 0;
+    flag_send_mode = 1;	// Turn on to receive data
+	
+	// Variables
+	LED[0] = LED[1] = LED[2] = LED[3] = LED[4] = 0;
+    a = b = c = d = 0;
+    count_receive_data = 0;
     error_code = 0;
 	error_code_interrupt = 0;
+	led_active = 0;	// The number of the selected indicator. 
+					// 4 is the far left
+	led_count = 2;
+    mode = 0;
 }
 
 void Model :: MK_Send()
 {
+	// Call from MK_Send_part()
 	uc Package [4], temp = 0;
 	
 	// Receiver ON
@@ -427,55 +446,54 @@ void Model :: MK_Send()
 	count_receive_data = 0; // In case of loss of parcels, or line break
 	a = b = c = d = 0;
 	flag_msg_received = 0;
-	//error_code = 0; //in Read_Msg()
 	
 	//Package [0]
 	Package[0] = mode;
 	
-	
-	// Implementation +++
 	if ((Package[0] > 3) && (Package[0] < 7)) 
 	{
-		if ((flag_ampl == 0) && (LED[0] == 9))
-			flag_ampl = 1;
+		if ((flag_mode_ampl == 0) && (LED[3] == 9))
+			flag_mode_ampl = 1;
 	}
 
-	if (flag_ampl == 1)
+	if (flag_mode_ampl == 1)
 	{
 		if ((Package[0] < 4) || (Package[0] > 6))
-			flag_ampl = 0;
+			flag_mode_ampl = 0;
 		else
 		{
 			Package[0] += 8;
 			flag_rw = 0;
 		}
 	}
-	// ++++++++++++++++++
 	
 	// the mode is greater than 13, or does 
 	// not fit into the limits for the mode
-	if (MK_Check(Package[0]) == 0)
+
+	MK_Check_and_correct(Package[0]);
+	
+	if (error_code > 3)
 	{
 		flag_msg_received = 1;
-		return ;//0;
+		return ;
 	}
+
 	if (flag_rw == 0) // Read
 		Package[1] = Package[2] = Package[3] = 0;
 	else //Write
 	{
-		//Package [1]
-		//if (mode & 0x90)	// 0b10010000
 		if (Package[0] == 8 || Package[0] == 9)
 		{	
-			Package[1] = LED[4];
+			Package[1] = LED[0];
 			Package[2] = Package[3] = 0;
 		}
 		else
 		{
-			Package[1] = LED[0];
-			Package[2] = (LED[1] << 4) | LED[2];
-			Package[3] = (LED[3] << 4) | LED[4];
+			Package[1] = LED[4];
+			Package[2] = (LED[3] << 4) | LED[2];
+			Package[3] = (LED[1] << 4) | LED[0];
 		}
+
 		Package[1] |= 0x80;
 	}
 	
@@ -484,17 +502,15 @@ void Model :: MK_Send()
 	
 	Package[0] = (Package[0] << 4) | 0x0F;
 	
-	//for (i=0;i<4;i++)
 	int i = 0, max = 4;
 	temp = 0;
 	
 	// Implementation +++
 	TXIF = 1;
 	// ++++++++++++++++++
-	while ((i < max) && (temp < 5)) // 250
+
+	while ((i < max) && (temp < 10)) 
 	{	
-		
-		
 		// Implementation +++
 		// key 7 "Send error"
 		if(GetAsyncKeyState(0x37))
@@ -504,11 +520,7 @@ void Model :: MK_Send()
 		// ++++++++++++++++++
 		
 		if (i == 4)
-		{
 			TXEN = 0; // Transmitter Turn Off
-			//i ++;
-		}
-		
 		else if (TXIF == 1)	// TXIF or TRMT.
 		{
 			bool parity = 0;
@@ -532,30 +544,40 @@ void Model :: MK_Send()
 		}
 		else
 			temp ++;	// fuze
-		//not_send = 0;
 	}
 	
 	
 	if (i != max) // Sent more or less
-		error_code = 4; //return 0;
-	return ;//1;
+		error_code = 4; 
+	return ;
 }
 
 void Model :: MK_Send_part(bool flag_first_launch)
 {
+	// Called in MK_main - In the end
 	static uc i;
 	static uc j;
 	
 	j ++;
-	if (j > 2) // 100
+	if (j > 2)
 	{
 		j = 0;
 		i ++;
 	}
 	
 	if (((i == 0) && (j == 1)) || (flag_first_launch == 1))
+	{
 		MK_Send();
-	else if ((i == 3) || ((flag_msg_received == 1) && (flag_ampl == 0)))
+		
+		if (error_code == 255)  // Too large numbers on LED
+		{
+			error_code = 0;
+			// Reset of dispatch without consequences
+			i = j = 0;
+			flag_send_mode = 0;
+		}
+	}
+	else if ((i == 3) || ((flag_msg_received == 1) && (flag_mode_ampl == 0)))
 	{
 		i = j = 0;
 		if (flag_msg_received == 1)
@@ -564,7 +586,7 @@ void Model :: MK_Send_part(bool flag_first_launch)
 			
 			// Implementation +++
 			flag_msg_received = 0;
-			if (flag_ampl == 0)
+			if (flag_mode_ampl == 0)
 			{
 				if (error_code == 0)
 					flag_send_mode = 0;
@@ -578,12 +600,14 @@ void Model :: MK_Send_part(bool flag_first_launch)
 
 uc Model :: MK_Show_ERROR()
 {
+	// Called in MK_main - At the beginning
 	static uc i; // time_show_0;
 	static uc j; // time_show_1;
 	uc work_led = 0x02;	// 0x02 work; 0x01 error
 	
 	j++;
-	if (j == 2) // 255
+
+	if (j == 2)
 	{
 		j = 0;
 		i ++;		
@@ -593,25 +617,25 @@ uc Model :: MK_Show_ERROR()
 		i = j = 0;
 	else if (error_code == 1)	// Parity
 	{
-		if (i < 2) //10
+		if (i < 2)
 			work_led = 0x01; 
 	}
 	else if(error_code == 2)	// Line is broken
 	{
-		if (i < 5) // 128
+		if (i < 5)
 			work_led = 0x01;
 	}
 	else if(error_code == 3)	// 12 mode, Error
 		work_led = 0x01;
 	else if(error_code == 4)	// Send Error
 	{
-		if (i < 5) // 128
+		if (i < 5)
 			work_led = 0x01;
-		else if((i > 5) && (i < 9)) //171, 214
+		else if((i > 5) && (i < 9))
 			work_led = 0x01;
 	}
 
-	if (i == 10) // 255
+	if (i == 10)
 		i = 0;
 	
 	// Implementation +++

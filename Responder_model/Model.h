@@ -12,30 +12,37 @@ const uc Translate_num_to_LED[11] = {
 class Model
 {
 public:
-	
+	// Registers and bits customizable in MK_Reg_Start_up 
 	bool GLINTD;
-	uc PIR1, PIE1, T0STA, INTSTA;
-	bool PEIF;
-	uc TXSTA, RCSTA, SPBRG, USB_CTRL;
-	uc TXREG, RCREG;
-	bool CREN, TX9D, TXEN, TXIF;
-	bool RCIF, RX9D, FERR, OERR;
 	uc PORTC, PORTD, PORTE;
 	uc DDRC, DDRD, DDRE;
-	uc LED_model [5];
+	uc PIR1, PIE1, T0STA, INTSTA;
+	uc TXSTA, RCSTA, SPBRG, USB_CTRL;
+	bool CREN;
 
-	// Global variables
-	bool flag_send_mode;
-    bool flag_rw;
-    bool flag_msg_received;
+	// Registers and bits are not configurable when starting
+	// MK, or read-only. Installed in Variable_Start_up_emulator
+	bool PEIF;
+	uc TXREG, RCREG;
+	bool TX9D, TXEN, TXIF;
+	bool RCIF, RX9D, FERR, OERR;
+
+
+	// Variables global in the original code
 	bool flag_manual_auto;
+	bool flag_mode_ampl;
+    bool flag_msg_received;
+    bool flag_rw;
+	bool flag_send_mode;
+
 	uc LED[5];
 	uc a, b, c, d;
-	uc led_active;
-    uc mode;
     uc count_receive_data;
     uc error_code;
 	uc error_code_interrupt;
+	uc led_active;
+	uc led_count;
+    uc mode;
 
 	// Local variables for an infinite loop in main
 	uc main_temp;
@@ -49,12 +56,14 @@ public:
 	//std :: string Respondent [12];
 	std :: vector<int> asd;
 	std :: vector <std :: string> Respondent;
-	uc Message [4][2];
+	uc Message [4][2];	// 4 bytes of messages, plus parity bits
 	std :: string Send_Message;
 	std :: string Recv_Message;
 	int count_send_emulator;
 	bool flag_led_work;
-	bool flag_ampl;
+	
+
+	uc LED_model [5];
 
 public:
 	Model (void);
@@ -74,7 +83,6 @@ public:
 
 	void My_send (int);
 	void My_recv (uc);
-	void My_recv2 (uc);
 
 	void Respondent_work (std :: string);
 
@@ -84,7 +92,6 @@ public:
 	std :: string Get_led();
 	std :: string Get_str_send(uc, uc, uc, uc);
 
-	void Set_led ();
 	void Set_PortE();
 	void Variable_Start_up_emulator();
 	void Variable_Start_up_local();
@@ -96,7 +103,8 @@ public:
 	void MK_Handler_receiver ();
 	
 	void MK_Btns_action (uc btn);
-	bool MK_Check(uc num);
+	void MK_Change_led_count(uc num);
+	void MK_Check_and_correct(uc num);
 	uc MK_Get_port_e(uc d_line);
 	void MK_Read_Msg();
 	void MK_Reg_Start_up();
