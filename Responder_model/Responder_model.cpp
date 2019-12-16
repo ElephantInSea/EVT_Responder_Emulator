@@ -9,7 +9,6 @@ int main()
 	Model Responder('1');
 	Responder.MK_Reg_Start_up();
 
-
 	while (GetAsyncKeyState(VK_ESCAPE) == 0)
 	{
 		system("cls");

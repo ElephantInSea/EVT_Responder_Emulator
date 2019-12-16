@@ -1,6 +1,6 @@
 #include "Model.h"
 // Microcontroller code
-void Model :: MK_main()
+void Model :: MK_while()
 {
 	// Called in One_more_step
 	uc temp = 0;
@@ -119,7 +119,7 @@ void Model :: MK_Check_mail (uc mail, bool nine)
 
 void Model :: MK_Handler_receiver ()
 {
-	// Called in MK_main - Interruption part
+	// Called in One_mode_step
 	/*Reception of data in variables a, b, c, d*/
 		
 	if(count_receive_data == 0)
@@ -176,7 +176,7 @@ void Model :: MK_Handler_receiver ()
 
 void Model :: MK_Btns_action (uc btn)
 {
-	// Called in MK_main - Button part 
+	// Called in MK_while - Button part 
 	uc temp = btn, count = 0;
 	while(temp)
 	{
@@ -229,7 +229,7 @@ void Model :: MK_Btns_action (uc btn)
 
 void Model :: MK_Change_led_count(uc num)
 {
-	// Called in MK_main - Mode part
+	// Called in MK_while - Mode part
 	if (num == 0)
 		led_count = 2;
 	else if (num == 1)
@@ -285,7 +285,6 @@ void Model :: MK_Check_and_correct(uc num)
 		factor = factor * 10;
 	}
 
-	int asd = led_real;
 	// If the limit is exceeded - the display will reset to the maximum value
 	if (led_real > led_max)
 	{
@@ -305,7 +304,7 @@ void Model :: MK_Check_and_correct(uc num)
 
 uc Model :: MK_Get_port_e(uc d_line)
 {
-	// Called in MK_main - Mode part
+	// Called in MK_while - Mode part
 	// In the original, the function is easier but more confusing.
 	uc temp = (PORTE ^ 0xF8) >> 3; // 0b000xxxxx
 	uc temp2 = 0;
@@ -380,7 +379,7 @@ void Model :: MK_Read_Msg()
 
 void Model :: MK_Reg_Start_up()
 {
-	// Call from MK_main
+	// Called in main - Responder_mode.cpp file
 	GLINTD = 1;		// Disable All Interrupts
 	PORTE = 0x00;	// Getting button codes and modes
 	DDRE  = 0x00;
@@ -554,7 +553,7 @@ void Model :: MK_Send()
 
 void Model :: MK_Send_part(bool flag_first_launch)
 {
-	// Called in MK_main - In the end
+	// Called in MK_while - In the end
 	static uc i;
 	static uc j;
 	
@@ -600,7 +599,7 @@ void Model :: MK_Send_part(bool flag_first_launch)
 
 uc Model :: MK_Show_ERROR()
 {
-	// Called in MK_main - At the beginning
+	// Called in MK_while - At the beginning
 	static uc i; // time_show_0;
 	static uc j; // time_show_1;
 	uc work_led = 0x02;	// 0x02 work; 0x01 error
@@ -647,4 +646,3 @@ uc Model :: MK_Show_ERROR()
 
 	return work_led;
 }
-

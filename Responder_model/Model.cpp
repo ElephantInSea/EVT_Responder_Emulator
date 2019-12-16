@@ -34,19 +34,15 @@ Model :: ~Model(void)
 }
 
 
-void Model :: Interrupts()
-{
-	// Called in One_mode_step
-	if (RCIF == 1)
-		MK_Handler_receiver();
-}
 
 void Model :: One_mode_step()
 {
 	// Called in Responder_model
-	Interrupts();
+	
+	if (RCIF == 1)
+		MK_Handler_receiver();
 	Set_PortE();
-	MK_main();
+	MK_while();
 }
 
 void Model :: Show_Indications()
@@ -66,6 +62,115 @@ void Model :: Show_Indications()
 	std :: cout << "ERROR: " << (flag_led_work ? " " : "O") << std :: endl;
 }
 
+
+std :: string Model :: Get_Error_status()
+{
+	// Called in Show_Indications
+	std :: string ans = "";
+	if (error_code == 0)
+		ans += "Normal";
+	else if (error_code == 1)
+		ans += "Parity issues";
+	else if (error_code == 2)
+		ans += "Line is broken";
+	else if(error_code == 3)
+		ans += "Error signal";
+	else
+		ans += "Send Error";
+	return ans;
+}
+
+std :: string Model :: Get_binary_format(uc target)
+{
+	// Called in Show_Indications
+	std :: string answer = "0b";
+	for(int i(0); i < 8; i ++)
+	{
+		if (target & 0x80)
+			answer += "1";
+		else
+			answer += "0";
+		target = target << 1;
+	}
+	return answer;
+}
+
+std :: string Model :: Get_led2()
+{
+	// Called in Show_Indications
+	std :: string answer = "";
+	static bool blink = true;
+	for (int i(0); i < 5; i++)
+	{
+		if ((i == (int)4 - led_active) && (blink))
+			answer += '_';
+		else if (i < (int)(4 - led_count))
+			answer += '_';
+		else
+			answer += 48 + LED[4 - i];
+	}
+	blink = !blink;
+	return answer;
+}
+
+std :: string Model :: Get_led()
+{
+	// The function is close to reality, but less convenient. 
+	// I'm using the second version
+	std :: string answer = "";
+	int num = 0;
+
+	for (int i(0); i < 11; i++)
+		if (PORTC == Translate_num_to_LED[i])
+		{
+			num = i;
+			break;
+		}
+	
+
+	uc temp = d_line == 0 ? 4 : (d_line - 1);
+	for (int i(0); i < 5; i ++)
+	{
+		if (i == temp)
+		{
+			if (num == 10)
+				answer += '_';
+			else
+				answer += 48 + num;
+		}
+		else
+			answer += '_';
+		answer += ' ';
+	}
+	return answer;
+}
+
+
+
+std :: string Hex_to_str (uc target)
+{
+	// Called in Get_str_send
+	std :: string ans = "";
+	uc temp = (target >> 4) & 0x0F;
+	temp += (temp < 10) ? 48 : 55;
+	ans += temp;
+	temp = target & 0x0F;
+	temp += (temp < 10) ? 48 : 55;
+	ans += temp;
+
+	return ans;
+}
+
+std :: string Model :: Get_str_send(uc A, uc B, uc C, uc D)
+{
+	// Called in My_send
+	std :: string ans = "0x ";
+	ans += Hex_to_str(A) + ' ';
+	ans += Hex_to_str(B) + ' ';
+	ans += Hex_to_str(C) + ' ';
+	ans += Hex_to_str(D);
+	return ans;
+}
 
 void Model :: My_send (int count)
 {
@@ -185,116 +290,9 @@ void Model :: Respondent_work (std :: string income_msg)
 	}
 }
 
-std :: string Model :: Get_Error_status()
-{
-	// Called in Show_Indications
-	std :: string ans = "";
-	if (error_code == 0)
-		ans += "Normal";
-	else if (error_code == 1)
-		ans += "Parity issues";
-	else if (error_code == 2)
-		ans += "Line is broken";
-	else if(error_code == 3)
-		ans += "Error signal";
-	else
-		ans += "Send Error";
-	return ans;
-}
-
-std :: string Model :: Get_binary_format(uc target)
-{
-	// Called in Show_Indications
-	std :: string answer = "0b";
-	for(int i(0); i < 8; i ++)
-	{
-		if (target & 0x80)
-			answer += "1";
-		else
-			answer += "0";
-		target = target << 1;
-	}
-	return answer;
-}
-
-std :: string Model :: Get_led2()
-{
-	// Called in Show_Indications
-	std :: string answer = "";
-	static bool blink = true;
-	for (int i(0); i < 5; i++)
-	{
-		if ((i == (int)4 - led_active) && (blink))
-			answer += '_';
-		else if (i < (int)(4 - led_count))
-			answer += '_';
-		else
-			answer += 48 + LED[4 - i];
-	}
-	blink = !blink;
-	return answer;
-}
-
-std :: string Model :: Get_led()
-{
-	// The function is close to reality, but less convenient. 
-	// I'm using the second version
-	std :: string answer = "";
-	int num = 0;
-
-	for (int i(0); i < 11; i++)
-		if (PORTC == Translate_num_to_LED[i])
-		{
-			num = i;
-			break;
-		}
-	
-
-	uc temp = d_line == 0 ? 4 : (d_line - 1);
-	for (int i(0); i < 5; i ++)
-	{
-		if (i == temp)
-		{
-			if (num == 10)
-				answer += '_';
-			else
-				answer += 48 + num;
-		}
-		else
-			answer += '_';
-		answer += ' ';
-	}
-	return answer;
-}
-
-std :: string Hex_to_str (uc target)
-{
-	// Called in Get_str_send
-	std :: string ans = "";
-	uc temp = (target >> 4) & 0x0F;
-	temp += (temp < 10) ? 48 : 55;
-	ans += temp;
-	temp = target & 0x0F;
-	temp += (temp < 10) ? 48 : 55;
-	ans += temp;
-
-	return ans;
-}
-
-std :: string Model :: Get_str_send(uc A, uc B, uc C, uc D)
-{
-	// Called in My_send
-	std :: string ans = "0x ";
-	ans += Hex_to_str(A) + ' ';
-	ans += Hex_to_str(B) + ' ';
-	ans += Hex_to_str(C) + ' ';
-	ans += Hex_to_str(D);
-	return ans;
-}
-
-
 void Model :: Set_PortE()
 {
+	// Called in One_mode_step
 	PORTE = 0;
 	static uc keys_work = 0;
 	static uc keys_temp = 0;
@@ -381,44 +379,34 @@ void Model :: Set_PortE()
 	PORTE ^= 0xFF;
 }
 
-
 void Model :: Variable_Start_up_emulator()
 {
 	// Called in constructor
-
 	for (int i(0); i < 4; i ++)
 		Message[i][0] = Message[i][0] = 0;
 
 	for (int i(0); i < 12; i++)
 		Respondent.push_back ("12345");
 	
-	for (int i(0); i < 5; i ++)
-		LED_model[i] = '0';
-	
-	TXREG = RCREG = 0;			// Registers and bits whose values 
-	TX9D = TXEN = TXIF = 0;		// are set by MK itself.
-	RCIF = RX9D = OERR = FERR = 0;
-
-	Send_Message = "Empty";
 	Recv_Message = "Empty";
+	Send_Message = "Empty";
 
 	count_send_emulator = 0;
 	flag_led_work = 0;
-	
+
+	RCIF = TXREG = RCREG = 0;	// Registers and bits whose values 
+	TX9D = TXEN = TXIF = 0;		// are set by MK itself.
+	RX9D = OERR = FERR = 0;
 }
 
 void Model :: Variable_Start_up_local()
 {
-	// «десь устанавливаютс€ переменные которые устанавливались
-	// перед мейном, но тут эти переменные перестали быть локальными.
-	// ѕлюс вс€кие переменные нужные дл€ эмул€тора
-	// Setting local variables
-	main_temp = 0; // Ќужно ли еще?
+	// Called in constructor
+	// Here variables are set that are local to the main,
+	// but here are class data
 
 	d_line = 0;
-	d_work_light = 0;
     flag_first_launch = 1;
-	
     led_blink = 0;
     
     uc mode_temp = 0, mode_time = 0;

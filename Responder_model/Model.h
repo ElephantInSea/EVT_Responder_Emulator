@@ -45,25 +45,21 @@ public:
     uc mode;
 
 	// Local variables for an infinite loop in main
-	uc main_temp;
 	int d_line;	
-	uc d_work_light; 
-    int led_blink;
-    uc mode_temp, mode_time;
-    uc buttons, buttons_time; 
     bool flag_first_launch;
+    int led_blink;
+	// uc led_blink_temp; // No need in the emulator - blinking so slow
+    uc mode_temp, mode_time;
+    uc buttons, buttons_time;
 
-	//std :: string Respondent [12];
-	std :: vector<int> asd;
-	std :: vector <std :: string> Respondent;
+	// Variables needed only for this emulator
 	uc Message [4][2];	// 4 bytes of messages, plus parity bits
-	std :: string Send_Message;
+	std :: vector <std :: string> Respondent;
 	std :: string Recv_Message;
+	std :: string Send_Message;
 	int count_send_emulator;
 	bool flag_led_work;
 	
-
-	uc LED_model [5];
 
 public:
 	Model (void);
@@ -71,33 +67,31 @@ public:
 	char portC, char ddrC = '1', 
 	char portD = '1', char ddrD = '1', 
 	char portE = '1', char ddrE = '1');
-		//(char, char, char, char, char, char);
 
 	~Model(void);
 	
-	// Model code
-	
-	void Interrupts();
+	// Model code - in in the file Model.cpp
 	void One_mode_step();
 	void Show_Indications();
 
-	void My_send (int);
-	void My_recv (uc);
 
-	void Respondent_work (std :: string);
-
+	// Part of Show_Indications()
 	std :: string Get_Error_status();
 	std :: string Get_binary_format(uc ); 
 	std :: string Get_led2();
 	std :: string Get_led();
-	std :: string Get_str_send(uc, uc, uc, uc);
 
+	// Other
+	std :: string Get_str_send(uc, uc, uc, uc);
+	void My_send (int);
+	void My_recv (uc);
+	void Respondent_work (std :: string);
 	void Set_PortE();
 	void Variable_Start_up_emulator();
 	void Variable_Start_up_local();
 
 	// Microcontroller code - in in the file Model_MK.cpp
-	void MK_main();
+	void MK_while();
 
 	void MK_Check_mail (uc mail, bool nine);
 	void MK_Handler_receiver ();
@@ -111,6 +105,5 @@ public:
 	void MK_Send();
 	void MK_Send_part(bool flag_first_launch);
 	uc MK_Show_ERROR();
-
 };
 
